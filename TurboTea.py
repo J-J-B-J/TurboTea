@@ -72,11 +72,12 @@ class TurboTea:
         self.mode = "Home"
         self.selection = 0
         self.status = "Tuning"
+        self.ignore_next_key_release = False
 
         self.dunk_time = 2
         self.cool_time = 10
 
-        self.draw_main_screen()
+        self.draw_home_screen()
         self.oled.show()
 
     def draw_menu_bar(self):
@@ -89,16 +90,6 @@ class TurboTea:
 
         # Draw the status text
         self.oled.text(self.status, 127 - (8 * len(self.status)), 1, 0)
-
-    def draw_play_logo(self, x: int, y: int, colour: int):
-        """Draw a play icon with the top-left corner at the given
-        coordinates"""
-        height = 12
-        for column in range(19):
-            for row in range(12 - height, 13 + height):
-                self.oled.pixel(x + column, y + row, colour)
-            if column % 3 != 0:
-                height -= 1
 
     def draw_cool_logo(self, x: int, y: int, colour: int):
         """Draw a cool icon with the top-left corner at the given
@@ -113,8 +104,8 @@ class TurboTea:
         for px_x, px_y in image:
             self.oled.pixel(x + px_x, y + px_y, colour)
 
-    def draw_main_screen(self):
-        """Do the main screen"""
+    def draw_home_screen(self):
+        """Draw the main screen"""
         # Draw the background
         self.oled.fill(0)
 
@@ -142,7 +133,13 @@ class TurboTea:
 
         # Draw the play button
         self.oled.text("Play", 5, 14, play_colour)  # Play text
-        self.draw_play_logo(13, 25, play_colour)  # Play logo
+        # Play logo
+        height = 12
+        for column in range(19):
+            for row in range(12 - height, 13 + height):
+                self.oled.pixel(13 + column, 25 + row, play_colour)
+            if column % 3 != 0:
+                height -= 1
 
         # Draw the dunk button
         self.oled.text("Dunk", 48, 14, dunk_colour)  # Dunk text
@@ -164,15 +161,101 @@ class TurboTea:
             cool_colour
         )  # Cool value
 
+    def draw_adjust_screen(self):
+        """Draw the adjust screen"""
+        # Draw the background
+        self.oled.fill(0)
+
+        # Draw the menu bar
+        self.draw_menu_bar()
+
+        # Draw the arrows
+        width = 1
+        for row in range(11):
+            for column in range(12 - width, 13 + width):
+                self.oled.pixel(column, 21 + row, 1)
+            if row % 3 != 0:
+                width += 1
+        width -= 1
+        for row in range(11):
+            for column in range(12 - width, 13 + width):
+                self.oled.pixel(column, 42 + row, 1)
+            if row % 3 != 0:
+                width -= 1
+
+        # Draw the exit text
+        self.oled.text("A+B: Save", 21, 54, 1)
+
+        if self.selection == 1:  # Dunk selected
+            # Draw the heading
+            self.oled.text("Dunk", 48, 13, 1)
+
+            draw_image_func = lambda x, y: self.draw_image(
+                x, y, self.TEABAG_IMAGE, 1)
+        else:  # Cool selected
+            # Draw the heading
+            self.oled.text("Cool", 48, 13, 1)
+
+            draw_image_func = lambda x, y: self.draw_cool_logo(x, y, 1)
+
     def key_pressed(self, key: int):
         """Update the display when one of the buttons is released"""
+        if self.ignore_next_key_release:
+            if key == 0 and self.key1.value():
+                self.ignore_next_key_release = False
+            elif key == 1 and self.key0.value():
+                self.ignore_next_key_release = False
+            return
         if self.mode == "Home":
             if key == 0:
                 self.selection = (self.selection + 1) % 3
+                self.draw_home_screen()
+                self.oled.show()
             else:
-                print(f"Selected item {self.selection}")
-            self.draw_main_screen()
-            self.oled.show()
+                if self.selection == 0:
+                    # TODO: Play
+                    pass
+                else:
+                    self.mode = "Adjust"
+                    self.draw_adjust_screen()
+                    self.oled.show()
+
+        elif self.mode == "Adjust":
+            if key == 0:
+                other_key: Pin = self.key1
+            else:
+                other_key: Pin = self.key0
+            if not other_key.value():  # Exit
+                self.mode = "Home"
+                self.draw_home_screen()
+                self.oled.show()
+                self.ignore_next_key_release = True
+            else:  # Adjust
+                change = 0
+                if self.selection == 1:  # Dunk adjust
+                    current_value = self.dunk_time
+                else:  # Cool adjust
+                    current_value = self.cool_time
+                if key == 0:  # Up
+                    if current_value < 10:  # Up to 10
+                        change = 0.5
+                    elif current_value < 99:  # 11 to 99
+                        change = 1
+                    else:  # 100+
+                        # TODO: play error sound
+                        pass
+                else:  # Down
+                    if current_value > 10:  # 11 to 99
+                        change = -1
+                    elif current_value > 0:  # 0.5 to 10
+                        change = -0.5
+                    else:  # 0-
+                        # TODO: play error sound
+                        pass
+                if self.selection == 1:  # Dunk adjust
+                    self.dunk_time += change
+                else:  # Cool adjust
+                    self.cool_time += change
 
 
 if __name__ == "__main__":
