@@ -228,6 +228,22 @@ class TurboTea:
 
             self.draw_cool_logo(98, 34, 1)
 
+    def draw_wait_screen(self):
+        # Draw the background
+        self.oled.fill(0)
+
+        # Draw the menu bar
+        self.draw_menu_bar()
+
+        # Draw the please wait text
+        self.oled.text("Please wait", 20, 18, 1)
+        self.oled.text("for tuning", 24, 27, 1)
+        self.oled.text("to finish.", 24, 36, 1)
+
+        # Draw the cancel button
+        self.oled.rect(32, 52, 64, 12, 1, True)  # Rectangle
+        self.oled.text("Cancel", 40, 54, 0)  # Cancel text
+
     def key_pressed(self, key: int):
         """Update the display when one of the buttons is released"""
         if self.ignore_next_key_release:
@@ -236,6 +252,7 @@ class TurboTea:
             elif key == 1 and self.key0.value():
                 self.ignore_next_key_release = False
             return
+
         if self.mode == "Home":
             if key == 0:
                 self.selection = (self.selection + 1) % 3
@@ -243,8 +260,13 @@ class TurboTea:
                 self.oled.show()
             else:
                 if self.selection == 0:
-                    # TODO: Run
-                    pass
+                    if self.status == "Tuning":
+                        self.mode = "Wait"
+                        self.draw_wait_screen()
+                        self.oled.show()
+                    else:
+                        self.mode = "Insert"
+                        # TODO: Instruct to insert teabag
                 else:
                     self.mode = "Adjust"
                     self.draw_adjust_screen()
@@ -289,6 +311,12 @@ class TurboTea:
                 if change:
                     self.draw_adjust_screen()
                     self.oled.show()
+
+        elif self.mode == "Wait":
+            if key == 1:  # Cancel
+                self.mode = "Home"
+                self.draw_home_screen()
+                self.oled.show()
 
 
 if __name__ == "__main__":
