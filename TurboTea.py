@@ -1,5 +1,7 @@
 from OLED import *
 from machine import Pin
+from _thread import start_new_thread
+from time import sleep
 
 
 class TurboTea:
@@ -66,8 +68,6 @@ class TurboTea:
         self.oled = Oled()
         self.key0 = Pin(15, Pin.IN, Pin.PULL_UP)
         self.key1 = Pin(17, Pin.IN, Pin.PULL_UP)
-        self.key0.irq(lambda _: self.key_pressed(0), Pin.IRQ_RISING)
-        self.key1.irq(lambda _: self.key_pressed(1), Pin.IRQ_RISING)
 
         self.mode = "Home"
         self.selection = 0
@@ -78,6 +78,25 @@ class TurboTea:
         self.cool_time: float = 10
 
         self.draw_home_screen()
+        self.oled.show()
+
+        # Enable interrupts
+        self.key0.irq(lambda _: self.key_pressed(0), Pin.IRQ_RISING)
+        self.key1.irq(lambda _: self.key_pressed(1), Pin.IRQ_RISING)
+
+        # Start a new process to tune the servo motor
+        start_new_thread(self.tune_servo, tuple())
+
+    def tune_servo(self):
+        """Tune the servo motor (move the peg to the corrct height)"""
+        sleep(10)  # TODO: Tune servo motor to correct height
+
+        self.status = "Ready"
+        if self.mode == "Wait":
+            # TODO: Prompt to enter teabag
+            self.draw_home_screen()
+        else:
+            self.draw_menu_bar()
         self.oled.show()
 
     def get_dunk_time(self) -> str:
@@ -266,7 +285,7 @@ class TurboTea:
                         self.oled.show()
                     else:
                         self.mode = "Insert"
-                        # TODO: Instruct to insert teabag
+                        # TODO: Prompt to insert teabag
                 else:
                     self.mode = "Adjust"
                     self.draw_adjust_screen()
