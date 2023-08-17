@@ -74,11 +74,23 @@ class TurboTea:
         self.status = "Tuning"
         self.ignore_next_key_release = False
 
-        self.dunk_time = 2
-        self.cool_time = 10
+        self.dunk_time: float = 2
+        self.cool_time: float = 10
 
         self.draw_home_screen()
         self.oled.show()
+
+    def get_dunk_time(self) -> str:
+        if float(int(self.dunk_time)) == self.dunk_time:
+            return str(int(self.dunk_time))
+        else:
+            return str(self.dunk_time)
+
+    def get_cool_time(self) -> str:
+        if float(int(self.cool_time)) == self.cool_time:
+            return str(int(self.cool_time))
+        else:
+            return str(self.cool_time)
 
     def draw_menu_bar(self):
         """Draw the menu bar for the TurboTea with the given status"""
@@ -112,18 +124,18 @@ class TurboTea:
         # Draw the menu bar
         self.draw_menu_bar()
 
-        if self.selection == 0:  # Play selected
-            play_colour = 0
+        if self.selection == 0:  # Run selected
+            run_colour = 0
             dunk_colour = 1
             cool_colour = 1
             selected_x = 0
         elif self.selection == 1:  # Dunk selected
-            play_colour = 1
+            run_colour = 1
             dunk_colour = 0
             cool_colour = 1
             selected_x = 43
         else:  # Cool selected
-            play_colour = 1
+            run_colour = 1
             dunk_colour = 1
             cool_colour = 0
             selected_x = 86
@@ -131,13 +143,13 @@ class TurboTea:
         # Draw the selected rectangle
         self.oled.rect(selected_x, 11, 42, 53, 1, True)
 
-        # Draw the play button
-        self.oled.text("Play", 5, 14, play_colour)  # Play text
-        # Play logo
+        # Draw the run button
+        self.oled.text("Run", 9, 14, run_colour)  # Run text
+        # Run logo
         height = 12
         for column in range(19):
             for row in range(12 - height, 13 + height):
-                self.oled.pixel(13 + column, 25 + row, play_colour)
+                self.oled.pixel(13 + column, 25 + row, run_colour)
             if column % 3 != 0:
                 height -= 1
 
@@ -145,8 +157,8 @@ class TurboTea:
         self.oled.text("Dunk", 48, 14, dunk_colour)  # Dunk text
         self.draw_image(50, 24, self.TEABAG_IMAGE, dunk_colour)  # Dunk logo
         self.oled.text(
-            f"{str(self.dunk_time)}m",
-            60 - (4 * len(str(self.dunk_time))),
+            f"{self.get_dunk_time()}m",
+            60 - (4 * len(self.get_dunk_time())),
             54,
             dunk_colour
         )  # Dunk value
@@ -155,8 +167,8 @@ class TurboTea:
         self.oled.text("Cool", 91, 14, cool_colour)  # Cool text
         self.draw_cool_logo(94, 25, cool_colour)  # Cool logo
         self.oled.text(
-            f"{str(self.cool_time)}m",
-            103 - (4 * len(str(self.cool_time))),
+            f"{str(self.get_cool_time())}m",
+            103 - (4 * len(str(self.get_cool_time()))),
             54,
             cool_colour
         )  # Cool value
@@ -186,17 +198,35 @@ class TurboTea:
         # Draw the exit text
         self.oled.text("A+B: Save", 21, 54, 1)
 
+        # Draw the title underline
+        self.oled.hline(48, 21, 32, 1)
+
         if self.selection == 1:  # Dunk selected
             # Draw the heading
             self.oled.text("Dunk", 48, 13, 1)
 
-            draw_image_func = lambda x, y: self.draw_image(
-                x, y, self.TEABAG_IMAGE, 1)
+            # Draw the time text
+            self.oled.text(
+                f"{str(self.get_dunk_time())} min{'s' if self.dunk_time != 1 else ''}",
+                45-(4*len(str(self.get_dunk_time()))),
+                29,
+                1
+            )
+
+            self.draw_image(98, 34, self.TEABAG_IMAGE, 1)
         else:  # Cool selected
             # Draw the heading
             self.oled.text("Cool", 48, 13, 1)
 
-            draw_image_func = lambda x, y: self.draw_cool_logo(x, y, 1)
+            # Draw the time text
+            self.oled.text(
+                f"{str(self.get_cool_time())} min{'s' if self.cool_time != 1 else ''}",
+                45-(4*len(str(self.get_cool_time()))),
+                29,
+                1
+            )
+
+            self.draw_cool_logo(98, 34, 1)
 
     def key_pressed(self, key: int):
         """Update the display when one of the buttons is released"""
@@ -213,7 +243,7 @@ class TurboTea:
                 self.oled.show()
             else:
                 if self.selection == 0:
-                    # TODO: Play
+                    # TODO: Run
                     pass
                 else:
                     self.mode = "Adjust"
@@ -256,6 +286,9 @@ class TurboTea:
                     self.dunk_time += change
                 else:  # Cool adjust
                     self.cool_time += change
+                if change:
+                    self.draw_adjust_screen()
+                    self.oled.show()
 
 
 if __name__ == "__main__":
