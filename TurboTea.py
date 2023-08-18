@@ -70,7 +70,8 @@ class TurboTea:
         self.key1 = Pin(17, Pin.IN, Pin.PULL_UP)
 
         self.mode = "Home"
-        self.selection = 0
+        self.selection_home = 0
+        self.selection_insert = 1
         self.status = "Tuning"
         self.ignore_next_key_release = False
 
@@ -93,8 +94,9 @@ class TurboTea:
 
         self.status = "Ready"
         if self.mode == "Wait":
-            # TODO: Prompt to enter teabag
-            self.draw_home_screen()
+            self.mode = "Insert"
+            self.selection_insert = 1
+            self.draw_insert_teabag_screen()
         else:
             self.draw_menu_bar()
         self.oled.show()
@@ -143,12 +145,12 @@ class TurboTea:
         # Draw the menu bar
         self.draw_menu_bar()
 
-        if self.selection == 0:  # Run selected
+        if self.selection_home == 0:  # Run selected
             run_colour = 0
             dunk_colour = 1
             cool_colour = 1
             selected_x = 0
-        elif self.selection == 1:  # Dunk selected
+        elif self.selection_home == 1:  # Dunk selected
             run_colour = 1
             dunk_colour = 0
             cool_colour = 1
@@ -220,7 +222,7 @@ class TurboTea:
         # Draw the title underline
         self.oled.hline(48, 21, 32, 1)
 
-        if self.selection == 1:  # Dunk selected
+        if self.selection_home == 1:  # Dunk selected
             # Draw the heading
             self.oled.text("Dunk", 48, 13, 1)
 
@@ -263,6 +265,25 @@ class TurboTea:
         self.oled.rect(32, 52, 64, 12, 1, True)  # Rectangle
         self.oled.text("Cancel", 40, 54, 0)  # Cancel text
 
+    def draw_insert_teabag_screen(self):
+        # Draw the background
+        self.oled.fill(0)
+
+        # Draw the menu bar
+        self.draw_menu_bar()
+
+        # Draw the insert teabag text
+        self.oled.text("Insert tea bag", 8, 24, 1)
+        self.oled.text("then press OK", 12, 33, 1)
+
+        # Draw the cancel button
+        self.oled.rect(0, 52, 64, 12, 1-self.selection_insert, True)
+        self.oled.text("Cancel", 8, 54, self.selection_insert)
+
+        # Draw the OK button
+        self.oled.rect(64, 52, 64, 12, self.selection_insert, True)
+        self.oled.text("OK", 88, 54, 1-self.selection_insert)
+
     def key_pressed(self, key: int):
         """Update the display when one of the buttons is released"""
         if self.ignore_next_key_release:
@@ -274,22 +295,21 @@ class TurboTea:
 
         if self.mode == "Home":
             if key == 0:
-                self.selection = (self.selection + 1) % 3
+                self.selection_home = (self.selection_home + 1) % 3
                 self.draw_home_screen()
-                self.oled.show()
             else:
-                if self.selection == 0:
+                if self.selection_home == 0:
                     if self.status == "Tuning":
                         self.mode = "Wait"
                         self.draw_wait_screen()
-                        self.oled.show()
                     else:
                         self.mode = "Insert"
-                        # TODO: Prompt to insert teabag
+                        self.selection_insert = 1
+                        self.draw_insert_teabag_screen()
                 else:
                     self.mode = "Adjust"
                     self.draw_adjust_screen()
-                    self.oled.show()
+            self.oled.show()
 
         elif self.mode == "Adjust":
             if key == 0:
@@ -303,7 +323,7 @@ class TurboTea:
                 self.ignore_next_key_release = True
             else:  # Adjust
                 change = 0
-                if self.selection == 1:  # Dunk adjust
+                if self.selection_home == 1:  # Dunk adjust
                     current_value = self.dunk_time
                 else:  # Cool adjust
                     current_value = self.cool_time
@@ -323,7 +343,7 @@ class TurboTea:
                     else:  # 0-
                         # TODO: play error sound
                         pass
-                if self.selection == 1:  # Dunk adjust
+                if self.selection_home == 1:  # Dunk adjust
                     self.dunk_time += change
                 else:  # Cool adjust
                     self.cool_time += change
@@ -336,6 +356,21 @@ class TurboTea:
                 self.mode = "Home"
                 self.draw_home_screen()
                 self.oled.show()
+
+        elif self.mode == "Insert":
+            if key == 0:
+                self.selection_insert = (self.selection_insert + 1) % 2
+                self.draw_insert_teabag_screen()
+            else:
+                if self.selection_insert == 0:
+                    self.mode = "Home"
+                    self.draw_home_screen()
+                else:
+                    self.mode = "Making"
+                    self.status = "Making"
+                    self.draw_menu_bar()  # TODO: Show make screen
+                    # TODO: Make tea
+            self.oled.show()
 
 
 if __name__ == "__main__":
