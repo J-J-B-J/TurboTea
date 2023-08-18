@@ -1,7 +1,7 @@
 from OLED import *
 from machine import Pin
 from _thread import start_new_thread
-from time import sleep
+from time import sleep, time
 
 
 class TurboTea:
@@ -77,6 +77,7 @@ class TurboTea:
 
         self.dunk_time: float = 2
         self.cool_time: float = 10
+        self.start_time: float = 0  # Time that the tea was started.
 
         self.draw_home_screen()
         self.oled.show()
@@ -284,6 +285,31 @@ class TurboTea:
         self.oled.rect(64, 52, 64, 12, self.selection_insert, True)
         self.oled.text("OK", 88, 54, 1-self.selection_insert)
 
+    def draw_make_screen(self):
+        # Draw the background
+        self.oled.fill(0)
+
+        # Draw the menu bar
+        self.draw_menu_bar()
+
+        # Draw the time text
+        total_time = (self.dunk_time + self.cool_time) * 60
+        time_so_far = int(time() - self.start_time)
+        time_remaining = total_time - time_so_far
+        mins_remaining = str(time_remaining//60)
+        secs_remaining = str(time_remaining%60) if time_remaining%60 > 9 else(
+                "0" + str(time_remaining%60))
+        time_text = f"{mins_remaining}:{secs_remaining}"
+        self.oled.text(time_text, 64-(4*len(time_text)), 21, 1)
+
+        # Draw the progress bar
+        self.oled.rect(6, 33, 116, 8, 1, False)
+        self.oled.rect(6, 33, int(116*(time_so_far/total_time)), 8, 1, True)
+
+        # Draw the cancel button
+        self.oled.rect(32, 52, 64, 12, 1, True)  # Rectangle
+        self.oled.text("Cancel", 40, 54, 0)  # Cancel text
+
     def key_pressed(self, key: int):
         """Update the display when one of the buttons is released"""
         if self.ignore_next_key_release:
@@ -351,7 +377,7 @@ class TurboTea:
                     self.draw_adjust_screen()
                     self.oled.show()
 
-        elif self.mode == "Wait":
+        elif self.mode == "Wait" or self.mode == "Making":
             if key == 1:  # Cancel
                 self.mode = "Home"
                 self.draw_home_screen()
@@ -368,7 +394,8 @@ class TurboTea:
                 else:
                     self.mode = "Making"
                     self.status = "Making"
-                    self.draw_menu_bar()  # TODO: Show make screen
+                    self.start_time = time()
+                    self.draw_make_screen()
                     # TODO: Make tea
             self.oled.show()
 
