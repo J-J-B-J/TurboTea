@@ -2360,7 +2360,7 @@ Timer operating mode.
 Timer operating mode.
    """
     @overload
-    def __init__(self, id: int, /):
+    def __init__(self, id: int = -1, /):
         """
       Construct a new timer object of the given ``id``. ``id`` of -1 constructs a
       virtual timer (if supported by a board).

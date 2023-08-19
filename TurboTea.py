@@ -1,7 +1,7 @@
 from OLED import *
-from machine import Pin
+from machine import Pin, Timer
 from _thread import start_new_thread
-from time import sleep, time
+from time import sleep, ticks_ms
 
 
 class TurboTea:
@@ -78,6 +78,8 @@ class TurboTea:
         self.dunk_time: float = 2
         self.cool_time: float = 10
         self.start_time: float = 0  # Time that the tea was started.
+        self.rise_teabag_timer = Timer()
+        self.update_display_timer = Timer()
 
         self.draw_home_screen()
         self.oled.show()
@@ -102,13 +104,47 @@ class TurboTea:
             self.draw_menu_bar()
         self.oled.show()
 
-    def get_dunk_time(self) -> str:
+    def lower_teabag(self, *_):
+        """Lower the teabag into the pot"""
+        print("Lowering teabag")  # TODO: lower teabag
+
+    def raise_teabag(self, *_):
+        """Raise the teabag from the pot"""
+        print("Raising teabag")  # TODO: raise teabag
+
+    def make_tea(self):
+        """Make the tea"""
+        self.lower_teabag()
+
+        self.rise_teabag_timer.init(
+            mode=Timer.ONE_SHOT,
+            period=int(self.dunk_time * 60_000),
+            callback=self.raise_teabag
+        )
+
+    def alert_tea_done(self):
+        print("Tea finished!")  # TODO: Play done sound
+
+    def update_time(self, *_):
+        if (int(ticks_ms()) / 1000 >= 60 * (self.dunk_time + self.cool_time) +
+                self.start_time):
+            self.update_display_timer.deinit()
+            print("Time's up!")  # TODO: Display finished screen
+            return
+        if self.mode != "Making":  # Cancelled
+            self.update_display_timer.deinit()
+            return
+
+        self.draw_make_screen()
+        self.oled.show()
+
+    def get_dunk_str(self) -> str:
         if float(int(self.dunk_time)) == self.dunk_time:
             return str(int(self.dunk_time))
         else:
             return str(self.dunk_time)
 
-    def get_cool_time(self) -> str:
+    def get_cool_str(self) -> str:
         if float(int(self.cool_time)) == self.cool_time:
             return str(int(self.cool_time))
         else:
@@ -179,8 +215,8 @@ class TurboTea:
         self.oled.text("Dunk", 48, 14, dunk_colour)  # Dunk text
         self.draw_image(50, 24, self.TEABAG_IMAGE, dunk_colour)  # Dunk logo
         self.oled.text(
-            f"{self.get_dunk_time()}m",
-            60 - (4 * len(self.get_dunk_time())),
+            f"{self.get_dunk_str()}m",
+            60 - (4 * len(self.get_dunk_str())),
             54,
             dunk_colour
         )  # Dunk value
@@ -189,8 +225,8 @@ class TurboTea:
         self.oled.text("Cool", 91, 14, cool_colour)  # Cool text
         self.draw_cool_logo(94, 25, cool_colour)  # Cool logo
         self.oled.text(
-            f"{str(self.get_cool_time())}m",
-            103 - (4 * len(str(self.get_cool_time()))),
+            f"{str(self.get_cool_str())}m",
+            103 - (4 * len(str(self.get_cool_str()))),
             54,
             cool_colour
         )  # Cool value
@@ -229,8 +265,9 @@ class TurboTea:
 
             # Draw the time text
             self.oled.text(
-                f"{str(self.get_dunk_time())} min{'s' if self.dunk_time != 1 else ''}",
-                45-(4*len(str(self.get_dunk_time()))),
+                f"{str(self.get_dunk_str())} min" +
+                ('s' if self.dunk_time != 1 else ''),
+                45-(4 * len(str(self.get_dunk_str()))),
                 29,
                 1
             )
@@ -242,8 +279,9 @@ class TurboTea:
 
             # Draw the time text
             self.oled.text(
-                f"{str(self.get_cool_time())} min{'s' if self.cool_time != 1 else ''}",
-                45-(4*len(str(self.get_cool_time()))),
+                f"{str(self.get_cool_str())} min" +
+                ('s' if self.cool_time != 1 else ''),
+                45-(4 * len(str(self.get_cool_str()))),
                 29,
                 1
             )
@@ -294,17 +332,22 @@ class TurboTea:
 
         # Draw the time text
         total_time = (self.dunk_time + self.cool_time) * 60
-        time_so_far = int(time() - self.start_time)
+        time_so_far = int(int(ticks_ms()) / 1000) - self.start_time
         time_remaining = total_time - time_so_far
-        mins_remaining = str(time_remaining//60)
-        secs_remaining = str(time_remaining%60) if time_remaining%60 > 9 else(
-                "0" + str(time_remaining%60))
+        mins_remaining = str(int(time_remaining//60))
+        secs_remaining = str(int(time_remaining % 60))
+        if time_remaining % 60 < 10:
+            secs_remaining = "0" + secs_remaining
         time_text = f"{mins_remaining}:{secs_remaining}"
         self.oled.text(time_text, 64-(4*len(time_text)), 21, 1)
 
         # Draw the progress bar
         self.oled.rect(6, 33, 116, 8, 1, False)
-        self.oled.rect(6, 33, int(116*(time_so_far/total_time)), 8, 1, True)
+        try:
+            self.oled.rect(6, 33, int(116*(time_so_far/total_time)), 8, 1,
+                           True)
+        except ZeroDivisionError:
+            self.oled.rect(6, 33, 116, 8, 1, True)
 
         # Draw the cancel button
         self.oled.rect(32, 52, 64, 12, 1, True)  # Rectangle
@@ -377,7 +420,7 @@ class TurboTea:
                     self.draw_adjust_screen()
                     self.oled.show()
 
-        elif self.mode == "Wait" or self.mode == "Making":
+        elif self.mode == "Wait":
             if key == 1:  # Cancel
                 self.mode = "Home"
                 self.draw_home_screen()
@@ -394,10 +437,20 @@ class TurboTea:
                 else:
                     self.mode = "Making"
                     self.status = "Making"
-                    self.start_time = time()
+                    self.start_time = int(ticks_ms()) / 1000
                     self.draw_make_screen()
-                    # TODO: Make tea
+                    self.make_tea()
+                    self.update_display_timer.init(period=1000, callback=self.update_time)
             self.oled.show()
+
+        elif self.mode == "Making":
+            if key == 1:  # Cancel
+                self.rise_teabag_timer.deinit()
+                self.raise_teabag()
+                self.mode = "Home"
+                sleep(0.01)
+                self.draw_home_screen()
+                self.oled.show()
 
 
 if __name__ == "__main__":
