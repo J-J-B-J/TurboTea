@@ -64,6 +64,41 @@ class TurboTea:
         (26, 26),
     ]
 
+    TEAPOT_IMAGE = [
+        # A list of (x, y) coordinates that represent a teapot image
+        (5, 0), (10, 0),
+        (4, 1), (5, 1), (9, 1), (10, 1),
+        (3, 2), (4, 2), (8, 2), (9, 2),
+        (3, 3), (4, 3), (8, 3), (9, 3),
+        (4, 4), (5, 4), (9, 4), (10, 4),
+        (5, 5), (6, 5), (10, 5), (11, 5),
+        (5, 6), (6, 6), (7, 6), (10, 6), (11, 6), (12, 6),
+        (6, 7), (7, 7), (8, 7), (11, 7), (12, 7), (13, 7),
+        (6, 8), (7, 8), (8, 8), (11, 8), (12, 8), (13, 8),
+        (5, 9), (6, 9), (7, 9), (10, 9), (11, 9), (12, 9),
+        # ROW 10 IS EMPTY
+        (0, 11), (1, 11), (2, 11), (3, 11), (4, 11), (5, 11), (6, 11), (7, 11),
+        (8, 11), (9, 11), (10, 11), (11, 11), (12, 11), (13, 11), (14, 11),
+        (15, 11), (16, 11), (17, 11),
+        (0, 12), (17, 12),
+        (0, 13), (17, 13), (18, 13), (19, 13), (20, 13),
+        (0, 14), (17, 14), (18, 14), (19, 14), (20, 14), (21, 14),
+        (0, 15), (17, 15), (18, 15), (19, 15), (20, 15), (21, 15),
+        (0, 16), (17, 16), (18, 16), (20, 16), (21, 16),
+        (0, 17), (17, 17), (18, 17), (20, 17), (21, 17),
+        (0, 18), (17, 18), (18, 18), (20, 18), (21, 18),
+        (0, 19), (17, 19), (18, 19), (20, 19), (21, 19),
+        (0, 20), (17, 20), (18, 20), (19, 20), (20, 20),
+        (0, 21), (17, 21), (18, 21), (19, 21), (20, 21),
+        (0, 22), (17, 22),
+        (0, 23), (17, 23),
+        (1, 24), (16, 24),
+        (1, 25), (2, 25), (15, 25), (16, 25),
+        (2, 26), (3, 26), (14, 26), (15, 26),
+        (3, 27), (4, 27), (5, 27), (6, 27), (7, 27), (8, 27), (9, 27),
+        (10, 27), (11, 27), (12, 27), (13, 27), (14, 27),
+    ]
+
     def __init__(self):
         self.oled = Oled()
         self.key0 = Pin(15, Pin.IN, Pin.PULL_UP)
@@ -93,7 +128,7 @@ class TurboTea:
 
     def tune_servo(self):
         """Tune the servo motor (move the peg to the corrct height)"""
-        sleep(10)  # TODO: Tune servo motor to correct height
+        sleep(5)  # TODO: Tune servo motor to correct height
 
         self.status = "Ready"
         if self.mode == "Wait":
@@ -114,22 +149,26 @@ class TurboTea:
 
     def make_tea(self):
         """Make the tea"""
-        self.lower_teabag()
+        if self.dunk_time:
+            self.lower_teabag()
 
-        self.rise_teabag_timer.init(
-            mode=Timer.ONE_SHOT,
-            period=int(self.dunk_time * 60_000),
-            callback=self.raise_teabag
-        )
+            self.rise_teabag_timer.init(
+                mode=Timer.ONE_SHOT,
+                period=int(self.dunk_time * 60_000),
+                callback=self.raise_teabag
+            )
 
-    def alert_tea_done(self):
+    def tea_done_sound(self):
         print("Tea finished!")  # TODO: Play done sound
 
     def update_time(self, *_):
         if (int(ticks_ms()) / 1000 >= 60 * (self.dunk_time + self.cool_time) +
                 self.start_time):
             self.update_display_timer.deinit()
-            print("Time's up!")  # TODO: Display finished screen
+            self.mode = "Finished"
+            start_new_thread(self.tea_done_sound, tuple())
+            self.draw_finish_screen()
+            self.oled.show()
             return
         if self.mode != "Making":  # Cancelled
             self.update_display_timer.deinit()
@@ -267,7 +306,7 @@ class TurboTea:
             self.oled.text(
                 f"{str(self.get_dunk_str())} min" +
                 ('s' if self.dunk_time != 1 else ''),
-                45-(4 * len(str(self.get_dunk_str()))),
+                45 - (4 * len(str(self.get_dunk_str()))),
                 29,
                 1
             )
@@ -281,7 +320,7 @@ class TurboTea:
             self.oled.text(
                 f"{str(self.get_cool_str())} min" +
                 ('s' if self.cool_time != 1 else ''),
-                45-(4 * len(str(self.get_cool_str()))),
+                45 - (4 * len(str(self.get_cool_str()))),
                 29,
                 1
             )
@@ -316,12 +355,12 @@ class TurboTea:
         self.oled.text("then press OK", 12, 33, 1)
 
         # Draw the cancel button
-        self.oled.rect(0, 52, 64, 12, 1-self.selection_insert, True)
+        self.oled.rect(0, 52, 64, 12, 1 - self.selection_insert, True)
         self.oled.text("Cancel", 8, 54, self.selection_insert)
 
         # Draw the OK button
         self.oled.rect(64, 52, 64, 12, self.selection_insert, True)
-        self.oled.text("OK", 88, 54, 1-self.selection_insert)
+        self.oled.text("OK", 88, 54, 1 - self.selection_insert)
 
     def draw_make_screen(self):
         # Draw the background
@@ -334,17 +373,17 @@ class TurboTea:
         total_time = (self.dunk_time + self.cool_time) * 60
         time_so_far = int(int(ticks_ms()) / 1000) - self.start_time
         time_remaining = total_time - time_so_far
-        mins_remaining = str(int(time_remaining//60))
+        mins_remaining = str(int(time_remaining // 60))
         secs_remaining = str(int(time_remaining % 60))
         if time_remaining % 60 < 10:
             secs_remaining = "0" + secs_remaining
         time_text = f"{mins_remaining}:{secs_remaining}"
-        self.oled.text(time_text, 64-(4*len(time_text)), 21, 1)
+        self.oled.text(time_text, 64 - (4 * len(time_text)), 21, 1)
 
         # Draw the progress bar
         self.oled.rect(6, 33, 116, 8, 1, False)
         try:
-            self.oled.rect(6, 33, int(116*(time_so_far/total_time)), 8, 1,
+            self.oled.rect(6, 33, int(116 * (time_so_far / total_time)), 8, 1,
                            True)
         except ZeroDivisionError:
             self.oled.rect(6, 33, 116, 8, 1, True)
@@ -352,6 +391,23 @@ class TurboTea:
         # Draw the cancel button
         self.oled.rect(32, 52, 64, 12, 1, True)  # Rectangle
         self.oled.text("Cancel", 40, 54, 0)  # Cancel text
+
+    def draw_finish_screen(self):
+        # Draw the background
+        self.oled.fill(0)
+
+        # Draw the menu bar
+        self.draw_menu_bar()
+
+        # Draw the finished text
+        self.oled.text("Finished", 32, 28, 1)
+
+        # Draw the teapot image
+        self.draw_image(103, 25, self.TEAPOT_IMAGE, 1)
+
+        # Draw the OK button
+        self.oled.rect(32, 52, 64, 12, 1, True)  # Rectangle
+        self.oled.text("OK", 56, 54, 0)  # OK text
 
     def key_pressed(self, key: int):
         """Update the display when one of the buttons is released"""
@@ -420,8 +476,8 @@ class TurboTea:
                     self.draw_adjust_screen()
                     self.oled.show()
 
-        elif self.mode == "Wait":
-            if key == 1:  # Cancel
+        elif self.mode == "Wait" or self.mode == "Finished":
+            if key == 1:  # Cancel (Wait) or OK (Finished)
                 self.mode = "Home"
                 self.draw_home_screen()
                 self.oled.show()
@@ -440,7 +496,8 @@ class TurboTea:
                     self.start_time = int(ticks_ms()) / 1000
                     self.draw_make_screen()
                     self.make_tea()
-                    self.update_display_timer.init(period=1000, callback=self.update_time)
+                    self.update_display_timer.init(period=1000,
+                                                   callback=self.update_time)
             self.oled.show()
 
         elif self.mode == "Making":
