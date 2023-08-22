@@ -1,7 +1,7 @@
 from OLED import *
-from machine import Pin, Timer
+from machine import Pin, Timer, PWM
 from _thread import start_new_thread
-from time import sleep, ticks_ms
+from time import sleep, ticks_ms, sleep_ms
 
 
 class TurboTea:
@@ -103,6 +103,7 @@ class TurboTea:
         self.oled = Oled()
         self.key0 = Pin(15, Pin.IN, Pin.PULL_UP)
         self.key1 = Pin(17, Pin.IN, Pin.PULL_UP)
+        self.speaker = PWM(Pin(0))
 
         self.mode = "Home"
         self.selection_home = 0
@@ -159,7 +160,20 @@ class TurboTea:
             )
 
     def tea_done_sound(self):
-        print("Tea finished!")  # TODO: Play done sound
+        self.speaker.freq(500)
+        while True:
+            if self.mode != "Finished":
+                return
+            self.speaker.duty_u16(30000)
+            sleep_ms(250)
+            self.speaker.duty_u16(0)
+            sleep_ms(250)
+            if self.mode != "Finished":
+                return
+            self.speaker.duty_u16(30000)
+            sleep_ms(250)
+            self.speaker.duty_u16(0)
+            sleep_ms(750)
 
     def update_time(self, *_):
         if (int(ticks_ms()) / 1000 >= 60 * (self.dunk_time + self.cool_time) +
