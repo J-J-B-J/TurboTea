@@ -1,6 +1,7 @@
 from machine import Pin, SPI
 import framebuf
 import time
+from _thread import get_ident
 
 DC = 8
 RST = 12
@@ -9,7 +10,14 @@ SCK = 10
 CS = 9
 
 
-class Oled(framebuf.FrameBuffer):
+# In this file, CTDC refers to cross-thread display communication, where
+# multiple threads attempt to communicate with the display at the same time,
+# causing communication errors.
+
+
+class OledLowLevel(framebuf.FrameBuffer):
+    """OLED without CTDC protection"""
+
     def __init__(self):
         self.width = 128
         self.height = 64
@@ -99,3 +107,181 @@ class Oled(framebuf.FrameBuffer):
             self.write_cmd(0x10 + (self.column >> 4))
             for num in range(0, 16):
                 self.write_data(self.buffer[page * 16 + num])
+
+
+class Oled:
+    """OLED with CTDC protection"""
+
+    def __init__(self):
+        self.oled = OledLowLevel()
+        self.writing_to_display_currently = None  # To prevent CTDC
+
+    def fill(self, c: int) -> None:
+        """
+       Fill the entire FrameBuffer with the specified color.
+      """
+        native_id = get_ident()
+        while self.writing_to_display_currently and self.writing_to_display_currently != native_id:  # Wait for CTDC to finish
+            pass
+        self.writing_to_display_currently = native_id
+        self.oled.fill(c)
+
+    def pixel(self, x: int, y: int, c: int = None) -> int:
+        """
+       If *c* is not given, get the color value of the specified pixel.
+       If *c* is given, set the specified pixel to the given color.
+      """
+        native_id = get_ident()
+        while self.writing_to_display_currently and self.writing_to_display_currently != native_id:  # Wait for CTDC to finish
+            pass
+        self.writing_to_display_currently = native_id
+        return self.oled.pixel(x, y, c)
+
+    def hline(self, x: int, y: int, w: int, c: int) -> None:
+        """
+       Draw a line from a set of coordinates using the given color and
+       a thickness of 1 pixel. The `line` method draws the line up to
+       a second set of coordinates whereas the `hline` and `vline`
+       methods draw horizontal and vertical lines respectively up to
+       a given length.
+      """
+        native_id = get_ident()
+        while self.writing_to_display_currently and self.writing_to_display_currently != native_id:  # Wait for CTDC to finish
+            pass
+        self.writing_to_display_currently = native_id
+        self.oled.hline(x, y, w, c)
+
+    def vline(self, x: int, y: int, h: int, c: int) -> None:
+        """
+       Draw a line from a set of coordinates using the given color and
+       a thickness of 1 pixel. The `line` method draws the line up to
+       a second set of coordinates whereas the `hline` and `vline`
+       methods draw horizontal and vertical lines respectively up to
+       a given length.
+      """
+        native_id = get_ident()
+        while self.writing_to_display_currently and self.writing_to_display_currently != native_id:  # Wait for CTDC to finish
+            pass
+        self.writing_to_display_currently = native_id
+        self.oled.vline(x, y, h, c)
+
+    def line(self, x1: int, y1: int, x2: int, y2: int, c: int) -> None:
+        """
+       Draw a line from a set of coordinates using the given color and
+       a thickness of 1 pixel. The `line` method draws the line up to
+       a second set of coordinates whereas the `hline` and `vline`
+       methods draw horizontal and vertical lines respectively up to
+       a given length.
+      """
+        native_id = get_ident()
+        while self.writing_to_display_currently and self.writing_to_display_currently != native_id:  # Wait for CTDC to finish
+            pass
+        self.writing_to_display_currently = native_id
+        self.oled.line(x1, y1, x2, y2, c)
+
+    def rect(self, x: int, y: int, w: int, h: int, c: int,
+             fill: bool = False) -> None:
+        """
+       Draw a rectangle at the given location, size and color. The `rect`
+       method draws only a 1 pixel outline whereas the `fill_rect` method
+       draws both the outline and interior.
+      """
+        native_id = get_ident()
+        while self.writing_to_display_currently and self.writing_to_display_currently != native_id:  # Wait for CTDC to finish
+            pass
+        self.writing_to_display_currently = native_id
+        self.oled.rect(x, y, w, h, c, fill)
+
+    def ellipse(self, x, y, xr, yr, c, f: bool = False,
+                m: int = 0) -> None:
+        """
+        Draw an ellipse at the given location. Radii xr and yr define the
+        geometry; equal values cause a circle to be drawn. The c parameter
+        defines the color.
+
+The optional f parameter can be set to True to fill the ellipse. Otherwise
+just a one pixel outline is drawn.
+
+The optional m parameter enables drawing to be restricted to certain
+quadrants of the ellipse. The LS four bits determine which quadrants are to
+be drawn, with bit 0 specifying Q1, b1 Q2, b2 Q3 and b3 Q4. Quadrants are
+numbered counterclockwise with Q1 being top right.
+        """
+        native_id = get_ident()
+        while self.writing_to_display_currently and self.writing_to_display_currently != native_id:  # Wait for CTDC to finish
+            pass
+        self.writing_to_display_currently = native_id
+        self.oled.ellipse(x, y, xr, yr, c, f, m)
+
+    def text(self, s: str, x: int, y: int, c: int = 1) -> None:
+        """
+       Write text to the FrameBuffer using the the coordinates as the
+       upper-left
+       corner of the text. The color of the text can be defined by the optional
+       argument but is otherwise a default value of 1. All characters have
+       dimensions of 8x8 pixels and there is currently no way to change the
+       font.
+      """
+        native_id = get_ident()
+        while self.writing_to_display_currently and self.writing_to_display_currently != native_id:  # Wait for CTDC to finish
+            pass
+        self.writing_to_display_currently = native_id
+        self.oled.text(s, x, y, c)
+
+    def scroll(self, xstep: int, ystep: int) -> None:
+        """
+       Shift the contents of the FrameBuffer by the given vector. This may
+       leave a footprint of the previous colors in the FrameBuffer.
+      """
+        native_id = get_ident()
+        while self.writing_to_display_currently and self.writing_to_display_currently != native_id:  # Wait for CTDC to finish
+            pass
+        self.writing_to_display_currently = native_id
+        self.oled.scroll(xstep, ystep)
+
+    def blit(
+            self,
+            fbuf: framebuf.FrameBuffer,
+            x: int,
+            y: int,
+            key: int = -1,
+            pallet: framebuf.FrameBuffer | None = None,
+    ) -> None:
+        """
+       Draw another FrameBuffer on top of the current one at the given
+       coordinates.
+       If *key* is specified then it should be a color integer and the
+       corresponding color will be considered transparent: all pixels with that
+       color value will not be drawn.
+
+       The *palette* argument enables blitting between FrameBuffers with
+       differing
+       formats. Typical usage is to render a monochrome or grayscale
+       glyph/icon to
+       a color display. The *palette* is a FrameBuffer instance whose format is
+       that of the current FrameBuffer. The *palette* height is one pixel
+       and its
+       pixel width is the number of colors in the source FrameBuffer. The
+       *palette*
+       for an N-bit source needs 2**N pixels; the *palette* for a monochrome
+       source
+       would have 2 pixels representing background and foreground colors. The
+       application assigns a color to each pixel in the *palette*. The color
+       of the
+       current pixel will be that of that *palette* pixel whose x position
+       is the
+       color of the corresponding source pixel.
+      """
+        native_id = get_ident()
+        while self.writing_to_display_currently and self.writing_to_display_currently != native_id:  # Wait for CTDC to finish
+            pass
+        self.writing_to_display_currently = native_id
+        self.oled.blit(fbuf, x, y, key, pallet)
+
+    def show(self):
+        native_id = get_ident()
+        while self.writing_to_display_currently and self.writing_to_display_currently != native_id:  # Wait for CTDC to finish
+            pass
+        self.writing_to_display_currently = native_id
+        self.oled.show()
+        self.writing_to_display_currently = None
