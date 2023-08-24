@@ -101,15 +101,17 @@ class TurboTea:
 
     def __init__(self):
         self.oled = Oled()
-        self.key0 = Pin(15, Pin.IN, Pin.PULL_UP)
-        self.key1 = Pin(17, Pin.IN, Pin.PULL_UP)
+        self.key0_rising = Pin(14, Pin.IN, Pin.PULL_UP)
+        self.key0_falling = self.key0 = Pin(15, Pin.IN, Pin.PULL_UP)
+        self.key1_rising = Pin(16, Pin.IN, Pin.PULL_UP)
+        self.key1_falling = self.key1 = Pin(17, Pin.IN, Pin.PULL_UP)
         self.speaker = PWM(Pin(0))
 
         self.mode = "Home"
         self.selection_home = 0
         self.selection_insert = 1
         self.status = "Tuning"
-        self.ignore_next_key_release = False
+        self.ignore_next_key_releases = 0
 
         self.dunk_time: float = 2
         self.cool_time: float = 10
@@ -121,15 +123,17 @@ class TurboTea:
         self.oled.show()
 
         # Enable interrupts
-        self.key0.irq(lambda _: self.key_pressed(0), Pin.IRQ_RISING)
-        self.key1.irq(lambda _: self.key_pressed(1), Pin.IRQ_RISING)
+        self.key0_rising.irq(lambda _: self.key_released(0), Pin.IRQ_RISING)
+        self.key1_rising.irq(lambda _: self.key_released(1), Pin.IRQ_RISING)
+        self.key0_falling.irq(lambda _: self.key_pressed(0), Pin.IRQ_FALLING)
+        self.key1_falling.irq(lambda _: self.key_pressed(1), Pin.IRQ_FALLING)
 
         # Start a new process to tune the servo motor
         start_new_thread(self.tune_servo, tuple())
 
     def tune_servo(self):
         """Tune the servo motor (move the peg to the corrct height)"""
-        sleep(5)  # TODO: Tune servo motor to correct height
+        sleep(2)  # TODO: Tune servo motor to correct height
 
         self.status = "Ready"
         if self.mode == "Wait":
@@ -284,7 +288,7 @@ class TurboTea:
             cool_colour
         )  # Cool value
 
-    def draw_adjust_screen(self):
+    def draw_adjust_screen(self, highlight_arrow=0):
         """Draw the adjust screen"""
         # Draw the background
         self.oled.fill(0)
@@ -295,14 +299,22 @@ class TurboTea:
         # Draw the arrows
         width = 1
         for row in range(11):
-            for column in range(12 - width, 13 + width):
-                self.oled.pixel(column, 21 + row, 1)
+            if highlight_arrow == 1 or row == 0 or row == 10:
+                for column in range(12 - width, 13 + width):
+                    self.oled.pixel(column, 21 + row, 1)
+            else:
+                self.oled.pixel(12 - width, 21 + row, 1)
+                self.oled.pixel(12 + width, 21 + row, 1)
             if row % 3 != 0:
                 width += 1
         width -= 1
         for row in range(11):
-            for column in range(12 - width, 13 + width):
-                self.oled.pixel(column, 42 + row, 1)
+            if highlight_arrow == 2 or row == 0 or row == 10:
+                for column in range(12 - width, 13 + width):
+                    self.oled.pixel(column, 42 + row, 1)
+            else:
+                self.oled.pixel(12 - width, 42 + row, 1)
+                self.oled.pixel(12 + width, 42 + row, 1)
             if row % 3 != 0:
                 width -= 1
 
@@ -424,12 +436,11 @@ class TurboTea:
         self.oled.text("OK", 56, 54, 0)  # OK text
 
     def key_pressed(self, key: int):
-        """Update the display when one of the buttons is released"""
-        if self.ignore_next_key_release:
-            if key == 0 and self.key1.value():
-                self.ignore_next_key_release = False
-            elif key == 1 and self.key0.value():
-                self.ignore_next_key_release = False
+        """Update the display when one of the buttons is pressed"""
+        if (not self.key0.value()) and (not self.key1.value()) and \
+                self.mode != "Adjust":
+            # Holding down two buttons
+            self.ignore_next_key_releases += 1
             return
 
         if self.mode == "Home":
@@ -446,6 +457,7 @@ class TurboTea:
                         self.selection_insert = 1
                         self.draw_insert_teabag_screen()
                 else:
+                    self.ignore_next_key_releases += 1
                     self.mode = "Adjust"
                     self.draw_adjust_screen()
             self.oled.show()
@@ -455,40 +467,17 @@ class TurboTea:
                 other_key: Pin = self.key1
             else:
                 other_key: Pin = self.key0
-            if not other_key.value():  # Exit
+            if other_key.value():  # Highlight
+                if key == 0:
+                    self.draw_adjust_screen(1)
+                else:
+                    self.draw_adjust_screen(2)
+                self.oled.show()
+            else:  # Exit
                 self.mode = "Home"
                 self.draw_home_screen()
                 self.oled.show()
-                self.ignore_next_key_release = True
-            else:  # Adjust
-                change = 0
-                if self.selection_home == 1:  # Dunk adjust
-                    current_value = self.dunk_time
-                else:  # Cool adjust
-                    current_value = self.cool_time
-                if key == 0:  # Up
-                    if current_value < 10:  # Up to 10
-                        change = 0.5
-                    elif current_value < 99:  # 11 to 99
-                        change = 1
-                    else:  # 100+
-                        # TODO: play error sound
-                        pass
-                else:  # Down
-                    if current_value > 10:  # 11 to 99
-                        change = -1
-                    elif current_value > 0:  # 0.5 to 10
-                        change = -0.5
-                    else:  # 0-
-                        # TODO: play error sound
-                        pass
-                if self.selection_home == 1:  # Dunk adjust
-                    self.dunk_time += change
-                else:  # Cool adjust
-                    self.cool_time += change
-                if change:
-                    self.draw_adjust_screen()
-                    self.oled.show()
+                self.ignore_next_key_releases = 2
 
         elif self.mode == "Wait" or self.mode == "Finished":
             if key == 1:  # Cancel (Wait) or OK (Finished)
@@ -522,6 +511,59 @@ class TurboTea:
                 sleep(0.01)
                 self.draw_home_screen()
                 self.oled.show()
+
+    def key_released(self, key: int):
+        """Update the display when one of the buttons is released"""
+        # TODO: Remove following
+        if self.ignore_next_key_releases:
+            self.ignore_next_key_releases -= 1
+            return
+
+        if self.mode == "Home":
+            pass
+
+        elif self.mode == "Adjust":
+            if key == 0:
+                other_key: Pin = self.key1
+            else:
+                other_key: Pin = self.key0
+            if other_key.value():  # Adjust
+                change = 0
+                if self.selection_home == 1:  # Dunk adjust
+                    current_value = self.dunk_time
+                else:  # Cool adjust
+                    current_value = self.cool_time
+                if key == 0:  # Up
+                    if current_value < 10:  # Up to 10
+                        change = 0.5
+                    elif current_value < 99:  # 11 to 99
+                        change = 1
+                    else:  # 100+
+                        # TODO: play error sound
+                        pass
+                else:  # Down
+                    if current_value > 10:  # 11 to 99
+                        change = -1
+                    elif current_value > 0:  # 0.5 to 10
+                        change = -0.5
+                    else:  # 0-
+                        # TODO: play error sound
+                        pass
+                if self.selection_home == 1:  # Dunk adjust
+                    self.dunk_time += change
+                else:  # Cool adjust
+                    self.cool_time += change
+                self.draw_adjust_screen()
+                self.oled.show()
+
+        elif self.mode == "Wait" or self.mode == "Finished":
+            pass
+
+        elif self.mode == "Insert":
+            pass
+
+        elif self.mode == "Making":
+            pass
 
 
 if __name__ == "__main__":
