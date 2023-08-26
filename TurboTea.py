@@ -460,6 +460,12 @@ class TurboTea:
             self.ignore_next_key_releases += 1
             return
 
+        if (key == 0 and self.key0.value()) or (
+                key == 1 and self.key1.value()):
+            # Key has been released already. Performing the action now would be
+            # too unresponsive
+            return
+
         if self.mode == "Home":
             if key == 0:
                 self.selection_home = (self.selection_home + 1) % 3
@@ -536,6 +542,12 @@ class TurboTea:
         """Update the display when one of the buttons is released"""
         if self.ignore_next_key_releases:
             self.ignore_next_key_releases -= 1
+            return
+
+        if (key == 0 and (not self.key0.value())) or (
+                key == 1 and (not self.key1.value())):
+            # Key has been released already. Performing the action now would be
+            # too unresponsive
             return
 
         if self.mode == "Home":
