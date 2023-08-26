@@ -118,6 +118,7 @@ class TurboTea:
         self.start_time: float = 0  # Time that the tea was started.
         self.rise_teabag_timer = Timer()
         self.update_display_timer = Timer()
+        self.beep_start_time = 0
 
         self.draw_home_screen()
         self.oled.show()
@@ -180,24 +181,31 @@ class TurboTea:
             self.speaker.duty_u16(0)
             sleep_ms(5000)
 
-    def beep_sound(self):
-        """Play a sound for pressing a button"""
+    def beep_sound_start(self):
+        """Start a sound for pressing a button"""
+        self.beep_start_time = ticks_ms()
         self.speaker.freq(500)
         self.speaker.duty_u16(1000)
-        sleep_ms(50)
+
+    def beep_sound_end(self):
+        """End a sound for pressing a button"""
+        while ticks_ms() - 50 < self.beep_start_time:
+            pass
         self.speaker.duty_u16(0)
 
     def error_sound(self):
         """Play a sound for an error"""
-        self.speaker.freq(500)
-        self.speaker.duty_u16(1000)
-        sleep_ms(100)
+        if not self.speaker.duty_u16():
+            self.speaker.freq(500)
+            self.speaker.duty_u16(1000)
+        while ticks_ms() - 100 < self.beep_start_time:
+            pass
         self.speaker.freq(400)
         sleep_ms(100)
         self.speaker.duty_u16(0)
 
     def update_time(self, *_):
-        if (int(ticks_ms()) / 1000 >= 60 * (self.dunk_time + self.cool_time) +
+        if (ticks_ms() / 1000 >= 60 * (self.dunk_time + self.cool_time) +
                 self.start_time):
             self.update_display_timer.deinit()
             self.mode = "Finished"
@@ -414,7 +422,7 @@ class TurboTea:
 
         # Draw the time text
         total_time = (self.dunk_time + self.cool_time) * 60
-        time_so_far = int(int(ticks_ms()) / 1000) - self.start_time
+        time_so_far = int(ticks_ms() / 1000) - self.start_time
         time_remaining = total_time - time_so_far
         mins_remaining = str(int(time_remaining // 60))
         secs_remaining = str(int(time_remaining % 60))
@@ -483,8 +491,9 @@ class TurboTea:
                     self.ignore_next_key_releases += 1
                     self.mode = "Adjust"
                     self.draw_adjust_screen()
+            self.beep_sound_start()
             self.oled.show()
-            self.beep_sound()
+            self.beep_sound_end()
 
         elif self.mode == "Adjust":
             if key == 0:
@@ -500,14 +509,17 @@ class TurboTea:
                 self.mode = "Home"
                 self.draw_home_screen()
                 self.ignore_next_key_releases = 2
+            self.beep_sound_start()
             self.oled.show()
+            self.beep_sound_end()
 
         elif self.mode == "Wait" or self.mode == "Finished":
             if key == 1:  # Cancel (Wait) or OK (Finished)
                 self.mode = "Home"
                 self.draw_home_screen()
+                self.beep_sound_start()
                 self.oled.show()
-                self.beep_sound()
+                self.beep_sound_end()
 
         elif self.mode == "Insert":
             if key == 0:
@@ -520,13 +532,14 @@ class TurboTea:
                 else:
                     self.mode = "Making"
                     self.status = "Making"
-                    self.start_time = int(ticks_ms()) / 1000
+                    self.start_time = ticks_ms() / 1000
                     self.draw_make_screen()
                     self.make_tea()
                     self.update_display_timer.init(period=1000,
                                                    callback=self.update_time)
+            self.beep_sound_start()
             self.oled.show()
-            self.beep_sound()
+            self.beep_sound_end()
 
         elif self.mode == "Making":
             if key == 1:  # Cancel
@@ -535,8 +548,9 @@ class TurboTea:
                 self.mode = "Home"
                 sleep(0.01)
                 self.draw_home_screen()
+                self.beep_sound_start()
                 self.oled.show()
-                self.beep_sound()
+                self.beep_sound_end()
 
     def key_released(self, key: int):
         """Update the display when one of the buttons is released"""
@@ -560,7 +574,6 @@ class TurboTea:
                 other_key: Pin = self.key0
             if other_key.value():  # Adjust
                 change = 0
-                error = False
                 if self.selection_home == 1:  # Dunk adjust
                     current_value = self.dunk_time
                 else:  # Cool adjust
@@ -572,7 +585,6 @@ class TurboTea:
                         change = 1
                     else:  # 100+
                         self.error_sound()
-                        error = True
                 else:  # Down
                     if current_value > 10:  # 11 to 99
                         change = -1
@@ -580,15 +592,12 @@ class TurboTea:
                         change = -0.5
                     else:  # 0-
                         self.error_sound()
-                        error = True
                 if self.selection_home == 1:  # Dunk adjust
                     self.dunk_time += change
                 else:  # Cool adjust
                     self.cool_time += change
                 self.draw_adjust_screen()
                 self.oled.show()
-                if not error:
-                    self.beep_sound()
 
         elif self.mode == "Wait" or self.mode == "Finished":
             pass
