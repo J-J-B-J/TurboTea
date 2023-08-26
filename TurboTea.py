@@ -246,7 +246,7 @@ class TurboTea:
     def draw_cool_logo(self, x: int, y: int, colour: int):
         """Draw a cool icon with the top-left corner at the given
         coordinates"""
-        self.oled.ellipse(x + 13, y + 13, 13, 13, colour)
+        self.oled.ellipse(x + 13, y + 13, 13, 13, colour, False, 15)
         self.oled.vline(x + 12, y + 3, 11, colour)
         self.oled.line(x + 12, y + 14, x + 18, y + 9, colour)
 
@@ -305,7 +305,7 @@ class TurboTea:
 
         # Draw the cool button
         self.oled.text("Cool", 91, 14, cool_colour)  # Cool text
-        self.draw_cool_logo(94, 25, cool_colour)  # Cool logo
+        self.draw_cool_logo(94, 24, cool_colour)  # Cool logo
         self.oled.text(
             f"{str(self.get_cool_str())}m",
             103 - (4 * len(str(self.get_cool_str()))),
