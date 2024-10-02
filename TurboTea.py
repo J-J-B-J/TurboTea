@@ -2,6 +2,7 @@ from OLED import *
 from machine import Pin, Timer, PWM
 from _thread import start_new_thread
 from time import sleep, ticks_ms, sleep_ms
+from servo import Servo
 
 
 class TurboTea:
@@ -105,7 +106,9 @@ class TurboTea:
         self.key0_falling = self.key0 = Pin(15, Pin.IN, Pin.PULL_UP)
         self.key1_rising = Pin(16, Pin.IN, Pin.PULL_UP)
         self.key1_falling = self.key1 = Pin(17, Pin.IN, Pin.PULL_UP)
-        self.speaker = PWM(Pin(0))
+        self.speaker = PWM(Pin(3))
+        self.servo = Servo(0)
+        self.reed = Pin(19, Pin.IN)
 
         self.mode = "Home"
         self.selection_home = 0
@@ -134,7 +137,11 @@ class TurboTea:
 
     def tune_servo(self):
         """Tune the servo motor (move the peg to the corrct height)"""
-        sleep(2)  # TODO: Tune servo motor to correct height
+        if self.reed.value():
+            self.servo.write(100)
+            while self.reed.value():
+                pass
+        self.raise_teabag()
 
         self.status = "Ready"
         if self.mode == "Wait":
@@ -147,11 +154,16 @@ class TurboTea:
 
     def lower_teabag(self, *_):
         """Lower the teabag into the pot"""
-        print("Lowering teabag")  # TODO: lower teabag
+        self.servo.write(100)
+        sleep_ms(600)
+        self.servo.write(90)
 
     def raise_teabag(self, *_):
         """Raise the teabag from the pot"""
-        print("Raising teabag")  # TODO: raise teabag
+        self.servo.write(80)
+        while not self.reed.value():
+            pass
+        self.servo.write(90)
 
     def make_tea(self):
         """Make the tea"""
@@ -185,7 +197,7 @@ class TurboTea:
         """Start a sound for pressing a button"""
         self.beep_start_time = ticks_ms()
         self.speaker.freq(500)
-        self.speaker.duty_u16(1000)
+        self.speaker.duty_u16(30000)
 
     def beep_sound_end(self):
         """End a sound for pressing a button"""
@@ -197,7 +209,7 @@ class TurboTea:
         """Play a sound for an error"""
         if not self.speaker.duty_u16():
             self.speaker.freq(500)
-            self.speaker.duty_u16(1000)
+            self.speaker.duty_u16(30000)
         while ticks_ms() - 100 < self.beep_start_time:
             pass
         self.speaker.freq(400)
@@ -530,6 +542,7 @@ class TurboTea:
                     self.mode = "Home"
                     self.draw_home_screen()
                 else:
+                    print("Making")
                     self.mode = "Making"
                     self.status = "Making"
                     self.start_time = ticks_ms() / 1000
@@ -611,3 +624,5 @@ class TurboTea:
 
 if __name__ == "__main__":
     TurboTea()
+
+
